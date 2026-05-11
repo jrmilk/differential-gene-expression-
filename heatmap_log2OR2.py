@@ -76,14 +76,16 @@ for cls in classes:
     ).sum()
 
 # =====================================================
-# CALCULATE LOG2(OR)
+# CALCULATE LOG2(OR) + PVALUES
 # =====================================================
 
 heatmap_data = []
+pval_data = []
 
 for cls in classes:
 
     row = []
+    prow = []
 
     for col in de_cols:
 
@@ -121,11 +123,13 @@ for cls in classes:
         log2_or = np.log2(oddsratio)
 
         row.append(log2_or)
+        prow.append(pvalue)
 
     heatmap_data.append(row)
+    pval_data.append(prow)
 
 # =====================================================
-# DATAFRAME
+# DATAFRAMES
 # =====================================================
 
 heatmap_df = pd.DataFrame(
@@ -134,23 +138,46 @@ heatmap_df = pd.DataFrame(
     columns=pretty_labels
 )
 
+pval_df = pd.DataFrame(
+    pval_data,
+    index=classes,
+    columns=pretty_labels
+)
+
+print("\nLOG2(OR):")
 print(heatmap_df)
+
+print("\nPVALUES:")
+print(pval_df)
+
+# =====================================================
+# COLOR SCALE
+# =====================================================
+
+max_abs = np.max(np.abs(heatmap_df.values))
+
+# round upward
+max_abs = np.ceil(max_abs * 10) / 10
+
+print(f"\nUsing color scale: {-max_abs} to {max_abs}")
 
 # =====================================================
 # PLOT
 # =====================================================
 
-fig, ax = plt.subplots(figsize=(16, 5))
+fig, ax = plt.subplots(figsize=(18, 5))
 
 im = ax.imshow(
     heatmap_df.values,
     aspect='auto',
     cmap='bwr',
-    vmin=-0.4,
-    vmax=0.4
+    vmin=-max_abs,
+    vmax=max_abs
 )
 
-# ticks
+# =====================================================
+# TICKS
+# =====================================================
 
 ax.set_xticks(np.arange(len(pretty_labels)))
 ax.set_yticks(np.arange(len(classes)))
@@ -169,17 +196,36 @@ ax.set_yticklabels(
     fontweight='bold'
 )
 
-# values inside cells
+# =====================================================
+# VALUES + SIGNIFICANCE
+# =====================================================
 
 for i in range(len(classes)):
     for j in range(len(pretty_labels)):
 
         value = heatmap_df.iloc[i, j]
+        pval = pval_df.iloc[i, j]
+
+        # significance stars
+
+        if pval < 0.001:
+            stars = "***"
+
+        elif pval < 0.01:
+            stars = "**"
+
+        elif pval < 0.05:
+            stars = "*"
+
+        else:
+            stars = ""
+
+        label = f"{value:.2f}{stars}"
 
         ax.text(
             j,
             i,
-            f"{value:.2f}",
+            label,
             ha='center',
             va='center',
             fontsize=10,
@@ -187,7 +233,9 @@ for i in range(len(classes)):
             color='black'
         )
 
-# colorbar
+# =====================================================
+# COLORBAR
+# =====================================================
 
 cbar = plt.colorbar(im)
 
@@ -197,13 +245,19 @@ cbar.set_label(
     fontweight='bold'
 )
 
-# title
+# =====================================================
+# TITLE
+# =====================================================
 
 plt.title(
     "Subgenomic enrichment of DE lncRNAs",
-    fontsize=14,
+    fontsize=15,
     fontweight='bold'
 )
+
+# =====================================================
+# LAYOUT
+# =====================================================
 
 plt.tight_layout()
 
@@ -221,5 +275,9 @@ plt.savefig(
     "heatmap_log2OR.svg",
     bbox_inches='tight'
 )
+
+# =====================================================
+# SHOW
+# =====================================================
 
 plt.show()
